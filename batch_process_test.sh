@@ -56,8 +56,5 @@ for i in $(seq 1 $TOTAL); do
 done
 rm -rf "$TMPDIR_R"
 
-avg=$(python3 -c "
-vals=[${elapsed_vals[*]}]
-print(f'{sum(vals)/len(vals):.1f}') if vals else print('0')
-")
+avg=$(echo "${elapsed_vals[@]}" | awk '{sum+=$1} END {if(NR>0) printf "%.1f", sum/NR; else print "0"}')
 echo "total=$TOTAL  success=$ok  fail=$fail  avg_latency=${avg}s"
