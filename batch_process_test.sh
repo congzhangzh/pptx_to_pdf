@@ -7,7 +7,7 @@
 PPTX="${1:-}"
 TOTAL="${2:-100}"
 CONCURRENCY="${3:-5}"
-URL="http://localhost:8000/ppt"
+URL="${API_URL:-http://localhost:8000/ppt}"
 TMPDIR_R=$(mktemp -d)
 
 if [[ -z "$PPTX" || ! -f "$PPTX" ]]; then

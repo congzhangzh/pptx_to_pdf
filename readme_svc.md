@@ -21,7 +21,19 @@ uv run python service.py
 
 # 测试
 
+## Linux
+
 ```bash
 # from WSL2 Debian
-URL=http://172.20.144.1:8000/ppt ./batch_process_test.sh  ppt169_禅意风_金刚经第一品研究.pptx
+#URL=http://172.20.144.1:8000/ppt ./batch_process_test.sh  ppt169_禅意风_金刚经第一品研究.pptx
+API_URL=http://172.18.208.1:8000/ppt ./batch_process_test.sh  ppt169_chanyifeng_jingangjingdiyipinyanjiu.pptx
+```
+
+## Windows
+
+```powershell
+# from WSL2 Debian
+#URL=http://172.20.144.1:8000/ppt ./batch_process_test.sh  ppt169_禅意风_金刚经第一品研究.pptx
+# $env:API_URL = "http://172.18.208.1:8000/ppt"
+./batch_process_test.ps1  ppt169_chanyifeng_jingangjingdiyipinyanjiu.pptx
 ```
