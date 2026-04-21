@@ -75,10 +75,24 @@ def _total_memory_mb() -> float:
 def _check_memory_and_exit() -> None:
     """Trigger SIGTERM if combined memory exceeds the configured limit."""
     import signal
+    import subprocess
     mb = _total_memory_mb()
     logger.info(f"memory {mb:.1f}MB / limit {MEMORY_LIMIT_MB}MB")
     if mb > MEMORY_LIMIT_MB:
         logger.warning(f"memory limit exceeded ({mb:.1f}MB > {MEMORY_LIMIT_MB}MB), triggering exit")
+        # 先温和关闭 COM worker
+        if com_worker:
+            try:
+                com_worker.shutdown()
+            except Exception as e:
+                logger.error(f"COM worker shutdown error: {e}")
+        # 强制杀 PowerPoint
+        try:
+            subprocess.run(["taskkill", "/F", "/IM", "POWERPNT.EXE"], 
+                         capture_output=True, timeout=5)
+        except Exception:
+            pass
+        # 最后杀自己
         os.kill(os.getpid(), signal.SIGTERM)
 
 
@@ -145,6 +159,13 @@ class ComWorker:
                     pass
             try:
                 pythoncom.CoUninitialize()
+            except Exception:
+                pass
+            # 强制杀死可能残留的 PowerPoint 进程
+            import subprocess
+            try:
+                subprocess.run(["taskkill", "/F", "/IM", "POWERPNT.EXE"], 
+                             capture_output=True, timeout=5)
             except Exception:
                 pass
 
