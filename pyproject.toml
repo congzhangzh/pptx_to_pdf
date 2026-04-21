@@ -5,6 +5,8 @@ description = "基于 COM 技术的 PPTX 到 PDF 转换服务"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.136.0",
+    "httpx>=0.28.0",
+    "psutil>=6.0.0",
     "python-multipart>=0.0.26",
     "uvicorn>=0.44.0",
     "pywin32>=306; sys_platform == 'win32'",
