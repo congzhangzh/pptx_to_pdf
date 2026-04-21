@@ -1,4 +1,5 @@
 @echo off
+chcp 65001
 :loop
 echo [supervisor] starting fake_ocr.py...
 uv run python fake_ocr.py
