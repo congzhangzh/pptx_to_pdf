@@ -21,6 +21,8 @@ import os
 import tempfile
 import threading
 import uuid
+from itertools import count
+
 from concurrent.futures import Future
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -40,7 +42,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler("service.log", encoding="utf-8"),
-        logging.StreamHandler()
+        # logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
@@ -52,7 +54,7 @@ OCR_TIMEOUT = 60
 OCR_URL = os.environ.get("OCR_URL", "http://localhost:9000/ocr")
 MEMORY_LIMIT_MB = int(os.environ.get("MEMORY_LIMIT_MB", "2048"))
 PORT = int(os.environ.get("PORT", "8000"))
-SHOW_PPT = os.environ.get("SHOW_PPT", "0").strip() in ("1", "true", "True")
+# SHOW_PPT = os.environ.get("SHOW_PPT", "0").strip() in ("1", "true", "True")
 
 
 # ---------------------------------------------------------------------------
@@ -115,19 +117,22 @@ class ComWorker:
         try:
             pythoncom.CoInitialize()
             powerpoint = win32com.client.Dispatch("PowerPoint.Application")
-            if SHOW_PPT:
-                powerpoint.Visible = True
-            else:
-                powerpoint.Visible = False
-            logger.info(f"PowerPoint instance ready (Visible={SHOW_PPT})")
+            # if SHOW_PPT:
+            #     powerpoint.Visible = True
+            # else:
+            #     powerpoint.Visible = False
+            # logger.info(f"PowerPoint instance ready (Visible={SHOW_PPT})")
             self._ready.set()
-
+            save_as_pdf_counter=0
             while True:
                 task = self._queue.get()
                 if task is self._SENTINEL:
                     logger.info("COM worker stopping")
                     break
+                save_as_pdf_counter += 1
+                logger.info(f"--begin-- [worker] save_as_pdf_counter={save_as_pdf_counter}")
                 self._handle_task(powerpoint, task)
+                logger.info(f"--end-- [worker] save_as_pdf_counter={save_as_pdf_counter}")
 
         except Exception as e:
             logger.error(f"COM worker error: {e}")
@@ -207,61 +212,68 @@ app = FastAPI(
 async def health():
     return {"status": "ok", "memory_mb": round(_total_memory_mb(), 1), "ocr_url": OCR_URL}
 
-
+api_ppt_counter_gen = count(1)
 @app.post("/ppt")
 async def convert_ppt(file: UploadFile):
     """
     Upload a PPT/PPTX file; returns OCR JSON result.
     """
-    filename = file.filename or "upload.pptx"
-    ext = os.path.splitext(filename)[1].lower()
-    if ext not in (".pptx", ".ppt"):
-        raise HTTPException(status_code=400, detail=f"unsupported file type: {ext}")
-
-    if com_worker is None:
-        raise HTTPException(status_code=503, detail="service not ready")
-
-    work_dir = tempfile.mkdtemp(prefix="pptx2pdf_")
-    task_id = uuid.uuid4().hex[:8]
-    input_path = os.path.join(work_dir, f"{task_id}{ext}")
-    output_path = os.path.join(work_dir, f"{task_id}.pdf")
-    pdf_name = os.path.splitext(filename)[0] + ".pdf"
-
+    local_api_ppt_counter = next(api_ppt_counter_gen)
     try:
-        content = await file.read()
-        with open(input_path, "wb") as f:
-            f.write(content)
-        logger.info(f"received {filename} ({len(content)} bytes)")
+        print(f"--begin-- [api] api_ppt_counter={local_api_ppt_counter}")
+        filename = file.filename or "upload.pptx"
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in (".pptx", ".ppt"):
+            raise HTTPException(status_code=400, detail=f"unsupported file type: {ext}")
 
-        # PPTX -> PDF (COM worker thread)
-        future = com_worker.convert(input_path, output_path)
-        await asyncio.wait_for(asyncio.wrap_future(future), timeout=CONVERT_TIMEOUT)
+        if com_worker is None:
+            raise HTTPException(status_code=503, detail="service not ready")
 
-        # PDF -> OCR
-        async with httpx.AsyncClient() as client:
-            with open(output_path, "rb") as pdf_file:
-                resp = await client.post(
-                    OCR_URL,
-                    files={"file": (pdf_name, pdf_file, "application/pdf")},
-                    timeout=OCR_TIMEOUT,
-                )
+        work_dir = tempfile.mkdtemp(prefix="pptx2pdf_")
+        task_id = uuid.uuid4().hex[:8]
+        input_path = os.path.join(work_dir, f"{task_id}{ext}")
+        output_path = os.path.join(work_dir, f"{task_id}.pdf")
+        pdf_name = os.path.splitext(filename)[0] + ".pdf"
 
-        if resp.status_code != 200:
-            raise HTTPException(status_code=502, detail=f"OCR service error: {resp.text}")
+        try:
+            content = await file.read()
+            with open(input_path, "wb") as f:
+                f.write(content)
+            logger.info(f"received {filename} ({len(content)} bytes)")
 
-        return resp.json()
+            # PPTX -> PDF (COM worker thread)
+            future = com_worker.convert(input_path, output_path)
+            await asyncio.wait_for(asyncio.wrap_future(future), timeout=CONVERT_TIMEOUT)
+            logger.info(f"--end-- [api] push task {input_path} -> {output_path}")
 
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="conversion timeout")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+            logger.info(f"--begin-- [api] do ocr for {pdf_name}:{output_path}")
+            # PDF -> OCR
+            async with httpx.AsyncClient() as client:
+                with open(output_path, "rb") as pdf_file:
+                    resp = await client.post(
+                        OCR_URL,
+                        files={"file": (pdf_name, pdf_file, "application/pdf")},
+                        timeout=OCR_TIMEOUT,
+                    )
+            logger.info(f"--end-- [api] do ocr for {pdf_name}:{output_path}")
+
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"OCR service error: {resp.text}")
+
+            return resp.json()
+
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="conversion timeout")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            _cleanup(work_dir)
+            _check_memory_and_exit()
     finally:
-        _cleanup(work_dir)
-        _check_memory_and_exit()
-
+        print(f"--end-- [api] api_ppt_counter={local_api_ppt_counter}")
 
 def _cleanup(path: str) -> None:
     import shutil

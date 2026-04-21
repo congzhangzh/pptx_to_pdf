@@ -9,6 +9,8 @@ Usage:
 
 import logging
 
+from itertools import count
+
 from fastapi import FastAPI, UploadFile
 from fastapi.responses import JSONResponse
 
@@ -17,7 +19,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler("fake_ocr.log", encoding="utf-8"),
-        logging.StreamHandler()
+        # logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
@@ -25,18 +27,26 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Fake OCR Service")
 
 
+api_ocr_counter_gen = count(1)
 @app.post("/ocr")
 async def ocr(file: UploadFile) -> JSONResponse:
-    content = await file.read()
-    logger.info(f"received file: {file.filename} ({len(content)} bytes) — returning stub response")
-    return JSONResponse(
-        content={
-            "status": "ok",
-            "filename": file.filename,
-            "pages": 1,
-            "text": "fake ocr text — replace with real OCR engine",
-        }
-    )
+    counter = next(api_ocr_counter_gen)
+    try:
+        logger.info(f"--begin-- request {counter}")
+        print(f"--begin-- request {counter} — received file: {file.filename}")
+        content = await file.read()
+        logger.info(f"received file: {file.filename} ({len(content)} bytes) — returning stub response")
+        return JSONResponse(
+            content={
+                "status": "ok",
+                "filename": file.filename,
+                "pages": 1,
+                "text": "fake ocr text — replace with real OCR engine",
+            }
+        )
+    finally:
+        logger.info(f"--end-- request {counter}")
+        print(f"--end-- request {counter} -- processed file: {file.filename}")
 
 
 @app.get("/health")
