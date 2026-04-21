@@ -1,4 +1,5 @@
 @echo off
+cd /d %~dp0
 set OCR_URL=http://localhost:9000/ocr
 :loop
 echo [supervisor] starting worker...
