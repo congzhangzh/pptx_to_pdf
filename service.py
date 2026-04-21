@@ -130,7 +130,7 @@ class ComWorker:
         powerpoint = None
         try:
             pythoncom.CoInitialize()
-            powerpoint = win32com.client.Dispatch("PowerPoint.Application")
+            powerpoint = win32com.client.DispatchEx("PowerPoint.Application")
             # if SHOW_PPT:
             #     powerpoint.Visible = True
             # else:
