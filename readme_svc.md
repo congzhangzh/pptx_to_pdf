@@ -18,3 +18,10 @@ uv run python service.py
 ```bash
 # find and replace '''OCR_URL = os.environ.get("OCR_URL", "http://localhost:9000/ocr")'''
 ```
+
+# 测试
+
+```bash
+# from WSL2 Debian
+URL=http://172.20.144.1:8000/ppt ./batch_process_test.sh  ppt169_禅意风_金刚经第一品研究.pptx
+```
