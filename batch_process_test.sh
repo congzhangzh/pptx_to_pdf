@@ -42,7 +42,8 @@ echo ""
 echo ""
 
 # tally results
-ok=0; fail=0; total_time=0
+ok=0; fail=0
+elapsed_vals=()
 for i in $(seq 1 $TOTAL); do
     read code elapsed < "$TMPDIR_R/$i"
     if [[ "$code" == "200" ]]; then
@@ -51,9 +52,12 @@ for i in $(seq 1 $TOTAL); do
         (( fail++ ))
         echo "  [FAIL] #$i -> HTTP $code"
     fi
-    total_time=$(echo "$total_time + $elapsed" | bc)
+    elapsed_vals+=("$elapsed")
 done
 rm -rf "$TMPDIR_R"
 
-avg=$(echo "scale=1; $total_time / $TOTAL" | bc)
+avg=$(python3 -c "
+vals=[${elapsed_vals[*]}]
+print(f'{sum(vals)/len(vals):.1f}') if vals else print('0')
+")
 echo "total=$TOTAL  success=$ok  fail=$fail  avg_latency=${avg}s"
