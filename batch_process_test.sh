@@ -30,11 +30,12 @@ batch=()
 for i in $(seq 1 $TOTAL); do
     send_one "$i" &
     batch+=($!)
+    printf "\r  dispatched %d / %d" "$i" "$TOTAL"
     if (( ${#batch[@]} >= CONCURRENCY )); then
         wait "${batch[@]}"
         batch=()
+        printf "\r  dispatched %d / %d (batch done)" "$i" "$TOTAL"
     fi
-    printf "\r  sent %d / %d" "$i" "$TOTAL"
 done
 wait "${batch[@]}" 2>/dev/null
 echo ""
