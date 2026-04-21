@@ -52,6 +52,7 @@ OCR_TIMEOUT = 60
 OCR_URL = os.environ.get("OCR_URL", "http://localhost:9000/ocr")
 MEMORY_LIMIT_MB = int(os.environ.get("MEMORY_LIMIT_MB", "2048"))
 PORT = int(os.environ.get("PORT", "8000"))
+SHOW_PPT = os.environ.get("SHOW_PPT", "0").strip() in ("1", "true", "True")
 
 
 # ---------------------------------------------------------------------------
@@ -114,8 +115,11 @@ class ComWorker:
         try:
             pythoncom.CoInitialize()
             powerpoint = win32com.client.Dispatch("PowerPoint.Application")
-            powerpoint.Visible = False
-            logger.info("PowerPoint instance ready")
+            if SHOW_PPT:
+                powerpoint.Visible = True
+            else:
+                powerpoint.Visible = False
+            logger.info(f"PowerPoint instance ready (Visible={SHOW_PPT})")
             self._ready.set()
 
             while True:

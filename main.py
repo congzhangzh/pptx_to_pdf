@@ -48,6 +48,7 @@ CONVERT_TIMEOUT = 120
 
 # 内存限制（MB）：Python 进程 + POWERPNT.EXE 之和超限后主动退出
 MEMORY_LIMIT_MB = int(os.environ.get("MEMORY_LIMIT_MB", "2048"))
+SHOW_PPT = os.environ.get("SHOW_PPT", "0").strip() in ("1", "true", "True")
 
 
 # ---------------------------------------------------------------------------
@@ -129,8 +130,11 @@ class ComWorker:
 
             # 创建 PowerPoint 实例
             powerpoint = win32com.client.Dispatch("PowerPoint.Application")
-            powerpoint.Visible = False
-            logger.info("PowerPoint 实例已创建")
+            if SHOW_PPT:
+                powerpoint.Visible = True
+            else:
+                powerpoint.Visible = False
+            logger.info(f"PowerPoint 实例已创建 (Visible={SHOW_PPT})")
 
             self._ready.set()
 
